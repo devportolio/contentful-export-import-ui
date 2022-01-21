@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import { PlainClientAPI } from 'contentful-management';
-import {Box, Button, Flex, Select} from '@contentful/f36-components';
+import { Box, Button, Flex, Select, Text } from '@contentful/f36-components';
 import { SidebarExtensionSDK } from '@contentful/app-sdk';
 import { CloudUploadIcon } from '@contentful/f36-icons';
 
@@ -12,21 +12,21 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ sdk }: SidebarProps) => {
-  // Set height
-  sdk.window.updateHeight(100)
-
   const [loading, setLoading] = useState(false)
   const [spaceId, setSpaceId] = useState('')
   const [environmentId, setEnvironmentId] = useState('')
   const [spaces, setSpaces] = useState([])
   const [environments, setEnvironments] = useState([])
+  const [isUpdating, setIsUpdating] = useState(true)
+  const [count, setCount] = useState({ total: 0, processed: 0 })
 
   const { space: currentSpaceId, environment: currentEnvironmentId, entry: entryId }: any = sdk.ids
   const {
     copyEndpoint,
     managementAccessToken: accessToken,
     defaultSpaceId,
-    defaultEnvironmentId
+    defaultEnvironmentId,
+    showOption
   }: any = sdk.parameters.instance
 
   const getSpaces = async () => {
@@ -63,6 +63,14 @@ const Sidebar = ({ sdk }: SidebarProps) => {
     }
   }
 
+  const showResultMessage = (success: boolean) => {
+    if (success) {
+      sdk.notifier.success("Copy content successful!")
+    } else {
+      sdk.notifier.error("Something went wrong")
+    }
+  }
+
   const performCopyData = () => {
     setLoading(true)
 
@@ -82,6 +90,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
       }
     }
 
+    setIsUpdating(true)
     fetch(`${copyEndpoint}/copy-content`, {
       method: 'POST',
       headers: {
@@ -92,12 +101,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
         .then(response => response.json())
         .then(res => {
           setLoading(false)
-
-          if (res) {
-            sdk.notifier.success("Copy content successful!")
-          } else {
-            sdk.notifier.error("Something went wrong")
-          }
+          // showResultMessage(res)
         })
         .catch(error => {
           setLoading(false)
@@ -125,11 +129,49 @@ const Sidebar = ({ sdk }: SidebarProps) => {
       })
   }
 
+  const checkUpdate = () => {
+    let showResult = 0
+
+    setTimeout(() => {
+      fetch(`${copyEndpoint}/import-update/${entryId}`)
+          .then(res => res.json())
+          .then(({ total, processed }) => {
+            setCount({ total, processed })
+
+            const updating = total > 0 && processed > 0
+            setIsUpdating(updating)
+
+            if (total > 0 && total === processed) {
+              console.log(showResult)
+              if (showResult === 0) {
+                showResult = 1
+                //setTimeout(() => showResultMessage(true), 3000)
+              }
+            }
+
+            checkUpdate()
+          })
+          .catch(error => {
+            console.error(error)
+            checkUpdate()
+          })
+    }, 2000)
+
+  }
+
+  const isProcessing = () => {
+    return loading || !hasDefault()
+  }
+
   useEffect(() => {
     getSpaces()
+    checkUpdate()
   }, [])
 
+  // Set height
+  sdk.window.updateHeight(showOption? 120: 100)
   return <>
+    {showOption ?
       <Flex justifyContent="space-between" style={{marginBottom:'10px'}}>
         <Box style={{width: '47%'}}>
           <Select
@@ -152,7 +194,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="environmentId"
               value={environmentId}
               onChange={(e) => setEnvironmentId(e.target.value)}
-              isDisabled={loading}
+              isDisabled={isProcessing()}
           >
             <Select.Option value="">Environment</Select.Option>
 
@@ -162,16 +204,40 @@ const Sidebar = ({ sdk }: SidebarProps) => {
           </Select>
         </Box>
       </Flex>
+      : <Flex justifyContent="space-between">
+          <Box>
+            <Text>Space: </Text>
+            <Text fontWeight="fontWeightDemiBold">{getSpace() && getSpace().name}</Text>
+          </Box>
+          <Box>
+            <Text>Environment: </Text>
+            <Text fontWeight="fontWeightDemiBold">{environmentId}</Text>
+          </Box>
+        </Flex>
+    }
       <Button
+          style={{marginTop: '10px'}}
           variant="secondary"
           onClick={showMessage}
           isFullWidth
           isLoading={loading}
-          isDisabled={loading || !hasDefault()}
+          isDisabled={isProcessing()}
           endIcon={<CloudUploadIcon />}
       >
         Copy to
       </Button>
+    { (isProcessing() && !isUpdating) &&
+      <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
+        <Text>Exporting...</Text>
+        <Text>{count.total} Entries</Text>
+      </Flex>
+    }
+    { isUpdating &&
+      <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
+        <Text>Copying...</Text>
+        <Text>{count.processed} of {count.total} Entries</Text>
+      </Flex>
+    }
     </>
 
 
