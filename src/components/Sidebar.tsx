@@ -17,8 +17,10 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   const [environmentId, setEnvironmentId] = useState('')
   const [spaces, setSpaces] = useState([])
   const [environments, setEnvironments] = useState([])
-  const [isUpdating, setIsUpdating] = useState(true)
+  const [isCopying, setIsCopying] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [count, setCount] = useState({ total: 0, processed: 0 })
+  const [isDone, setIsDone] = useState(false)
 
   const { space: currentSpaceId, environment: currentEnvironmentId, entry: entryId }: any = sdk.ids
   const {
@@ -90,7 +92,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
       }
     }
 
-    setIsUpdating(true)
+    setLoading(true)
     fetch(`${copyEndpoint}/copy-entry`, {
       method: 'POST',
       headers: {
@@ -101,11 +103,10 @@ const Sidebar = ({ sdk }: SidebarProps) => {
         .then(response => response.json())
         .then(res => {
           setLoading(false)
-          // showResultMessage(res)
         })
         .catch(error => {
           setLoading(false)
-          sdk.notifier.error("Something went wrong")
+          showResultMessage(false)
         });
   }
 
@@ -130,7 +131,6 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   }
 
   const checkUpdate = () => {
-    let showResult = 0
 
     setTimeout(() => {
       fetch(`${copyEndpoint}/copy-entry/update/${entryId}`)
@@ -138,16 +138,10 @@ const Sidebar = ({ sdk }: SidebarProps) => {
           .then(({ total, processed }) => {
             setCount({ total, processed })
 
-            const updating = total > 0 && processed > 0
-            setIsUpdating(updating)
-
-            if (total > 0 && total === processed) {
-              console.log(showResult)
-              if (showResult === 0) {
-                showResult = 1
-                //setTimeout(() => showResultMessage(true), 3000)
-              }
-            }
+            const copying = total > 0 && processed > 0
+            const exporting = total > 0 && processed === 0
+            setIsCopying(copying)
+            setIsExporting(exporting)
 
             checkUpdate()
           })
@@ -155,7 +149,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
             console.error(error)
             checkUpdate()
           })
-    }, 2000)
+    }, 1500)
 
   }
 
@@ -179,7 +173,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="spaceId"
               value={spaceId}
               onChange={handleSetSpace}
-              isDisabled={loading}
+              isDisabled={isProcessing()||isCopying}
           >
             <Select.Option value="">Space</Select.Option>
 
@@ -194,7 +188,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="environmentId"
               value={environmentId}
               onChange={(e) => setEnvironmentId(e.target.value)}
-              isDisabled={isProcessing()||isUpdating}
+              isDisabled={isProcessing()||isCopying}
           >
             <Select.Option value="">Environment</Select.Option>
 
@@ -220,19 +214,19 @@ const Sidebar = ({ sdk }: SidebarProps) => {
           variant="secondary"
           onClick={showMessage}
           isFullWidth
-          isLoading={loading}
-          isDisabled={isProcessing()||isUpdating}
+          isLoading={isProcessing()||isCopying}
+          isDisabled={isProcessing()||isCopying}
           endIcon={<CloudUploadIcon />}
       >
         Copy to
       </Button>
-    { (isProcessing() && !isUpdating) &&
+    { isExporting &&
       <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
         <Text>Exporting...</Text>
         <Text>{count.total} Entries</Text>
       </Flex>
     }
-    { isUpdating &&
+    { isCopying &&
       <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
         <Text>Copying...</Text>
         <Text>{count.processed} of {count.total} Entries</Text>
