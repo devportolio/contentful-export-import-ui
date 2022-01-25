@@ -20,7 +20,6 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   const [isCopying, setIsCopying] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [count, setCount] = useState({ total: 0, processed: 0 })
-  const [isDone, setIsDone] = useState(false)
 
   const { space: currentSpaceId, environment: currentEnvironmentId, entry: entryId }: any = sdk.ids
   const {
