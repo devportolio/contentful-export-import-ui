@@ -91,7 +91,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
     }
 
     setIsUpdating(true)
-    fetch(`${copyEndpoint}/copy-content`, {
+    fetch(`${copyEndpoint}/copy-entry`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
     let showResult = 0
 
     setTimeout(() => {
-      fetch(`${copyEndpoint}/import-update/${entryId}`)
+      fetch(`${copyEndpoint}/copy-entry/update/${entryId}`)
           .then(res => res.json())
           .then(({ total, processed }) => {
             setCount({ total, processed })
@@ -194,7 +194,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="environmentId"
               value={environmentId}
               onChange={(e) => setEnvironmentId(e.target.value)}
-              isDisabled={isProcessing()}
+              isDisabled={isProcessing()||isUpdating}
           >
             <Select.Option value="">Environment</Select.Option>
 
@@ -221,7 +221,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
           onClick={showMessage}
           isFullWidth
           isLoading={loading}
-          isDisabled={isProcessing()}
+          isDisabled={isProcessing()||isUpdating}
           endIcon={<CloudUploadIcon />}
       >
         Copy to
