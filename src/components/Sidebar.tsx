@@ -3,12 +3,18 @@ import { PlainClientAPI } from 'contentful-management';
 import { Box, Button, Flex, Select, Text } from '@contentful/f36-components';
 import { SidebarExtensionSDK } from '@contentful/app-sdk';
 import { CloudUploadIcon } from '@contentful/f36-icons';
+import { io } from "socket.io-client";
 
 const contentful = require('contentful-management')
 
 interface SidebarProps {
   sdk: SidebarExtensionSDK;
   cma: PlainClientAPI;
+}
+
+interface CopyData {
+  total: number,
+  processed: number
 }
 
 const Sidebar = ({ sdk }: SidebarProps) => {
@@ -20,6 +26,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   const [isCopying, setIsCopying] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [count, setCount] = useState({ total: 0, processed: 0 })
+  const [socket, setSocket] = useState(null)
 
   const { space: currentSpaceId, environment: currentEnvironmentId, entry: entryId }: any = sdk.ids
   const {
@@ -29,6 +36,66 @@ const Sidebar = ({ sdk }: SidebarProps) => {
     defaultEnvironmentId,
     showOption
   }: any = sdk.parameters.instance
+
+  const initializeSocket = () => {
+    const connection: any = io(copyEndpoint)
+    setSocket(connection)
+
+    connection.on('itemQueued'+entryId, (data: any) => {
+      console.log(data)
+    })
+
+    connection.on('copyIsDone'+entryId, (data: any) => {
+      setCount({ total: 0, processed: 0 })
+      setIsExporting(false)
+      setIsCopying(false)
+    })
+
+    connection.on('processing'+entryId, (data: any) => {
+      setCount({ total: 0, processed: 0 })
+      setIsExporting(false)
+      setIsCopying(false)
+    })
+
+    connection.on('exporting'+entryId, (count: CopyData) => {
+      setIsExporting(true)
+      setIsCopying(false)
+      setCount(count)
+      setLoading(true)
+    })
+
+    connection.on('exportDone'+entryId, () => {
+      console.log('exportDone')
+      setIsExporting(false)
+      setIsCopying(true)
+    })
+
+    connection.on('importing'+entryId, (count: CopyData) => {
+      console.log('importing')
+      setIsExporting(false)
+      setIsCopying(true)
+      setLoading(true)
+      setCount(count)
+    })
+
+    connection.on('importDone'+entryId, () => {
+      console.log('importDone')
+      setIsExporting(false)
+      setIsCopying(false)
+      setLoading(false)
+      showResultMessage(true)
+    })
+  }
+
+  const emit = (event: string, payload: any) => {
+    if (!socket) {
+      console.log('Socket is not ready')
+      return;
+    }
+
+    // @ts-ignore
+    socket.emit(event, payload)
+  }
 
   const getSpaces = async () => {
     const client = contentful.createClient({ accessToken })
@@ -76,37 +143,18 @@ const Sidebar = ({ sdk }: SidebarProps) => {
     setLoading(true)
 
     const data = {
-      import: {
-        entryId,
-        spaceId,
-        environmentId,
-        managementToken: accessToken,
-      },
-
-      export: {
-        entryId,
+      entryId,
+      source: {
         spaceId: currentSpaceId,
-        environmentId: currentEnvironmentId,
-        managementToken: accessToken,
+        environmentId: currentEnvironmentId
+      },
+      destination: {
+        spaceId,
+        environmentId
       }
     }
 
-    setLoading(true)
-    fetch(`${copyEndpoint}/copy-entry`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data) // body data type must match "Content-Type" header
-    })
-        .then(response => response.json())
-        .then(res => {
-          setLoading(false)
-        })
-        .catch(error => {
-          setLoading(false)
-          showResultMessage(false)
-        });
+    emit('copyEntry', data);
   }
 
   const getSpace: any = () => {
@@ -129,36 +177,13 @@ const Sidebar = ({ sdk }: SidebarProps) => {
       })
   }
 
-  const checkUpdate = () => {
-
-    setTimeout(() => {
-      fetch(`${copyEndpoint}/copy-entry/update/${entryId}`)
-          .then(res => res.json())
-          .then(({ total, processed }) => {
-            setCount({ total, processed })
-
-            const copying = total > 0 && processed > 0
-            const exporting = total > 0 && processed === 0
-            setIsCopying(copying)
-            setIsExporting(exporting)
-
-            checkUpdate()
-          })
-          .catch(error => {
-            console.error(error)
-            checkUpdate()
-          })
-    }, 1500)
-
-  }
-
   const isProcessing = () => {
     return loading || !hasDefault()
   }
 
   useEffect(() => {
+    initializeSocket()
     getSpaces()
-    checkUpdate()
   }, [])
 
   // Set height
