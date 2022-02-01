@@ -5,13 +5,14 @@ import { createClient } from 'contentful-management';
 import {
   SidebarExtensionSDK,
   init,
-  locations,
+  locations, AppExtensionSDK,
 } from '@contentful/app-sdk';
 import type { KnownSDK } from '@contentful/app-sdk';
 import { GlobalStyles } from '@contentful/f36-components';
 
 import Sidebar from './components/Sidebar';
 import LocalhostWarning from "./components/LocalhostWarning";
+import ConfigScreen from "./components/ConfigScreen";
 
 if (process.env.NODE_ENV === 'development' && window.self === window.top) {
   // You can remove this if block before deploying your app
@@ -40,6 +41,10 @@ if (process.env.NODE_ENV === 'development' && window.self === window.top) {
     // Feel free to remove unused locations
     // Dont forget to delete the file too :)
     const ComponentLocationSettings = [
+      {
+        location: locations.LOCATION_APP_CONFIG,
+        component: <ConfigScreen cma={cma} sdk={sdk as AppExtensionSDK} />,
+      },
       {
         location: locations.LOCATION_ENTRY_SIDEBAR,
         component: <Sidebar cma={cma} sdk={sdk as SidebarExtensionSDK} />,
