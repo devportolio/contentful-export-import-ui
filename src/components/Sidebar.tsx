@@ -24,9 +24,11 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   const [spaces, setSpaces] = useState([])
   const [environments, setEnvironments] = useState([])
   const [isCopying, setIsCopying] = useState(false)
+  const [copyStatus, setCopyStatus] = useState({ done: true, date: null })
   const [isExporting, setIsExporting] = useState(false)
   const [count, setCount] = useState({ total: 0, processed: 0 })
   const [socket, setSocket] = useState(null)
+  const [position, setPosition] = useState(0)
 
   const { space: currentSpaceId, environment: currentEnvironmentId, entry: entryId }: any = sdk.ids
   const {
@@ -38,11 +40,16 @@ const Sidebar = ({ sdk }: SidebarProps) => {
   }: any = sdk.parameters.instance
 
   const initializeSocket = () => {
-    const connection: any = io(copyEndpoint)
+    const connection: any = io(copyEndpoint, { query: { entryId }})
     setSocket(connection)
+
+    connection.on('copiedStatus'+entryId, (data: any) => {
+      setCopyStatus(data)
+    })
 
     connection.on('itemQueued'+entryId, (data: any) => {
       console.log(data)
+      setPosition(data.position)
     })
 
     connection.on('copyIsDone'+entryId, (data: any) => {
@@ -177,8 +184,8 @@ const Sidebar = ({ sdk }: SidebarProps) => {
       })
   }
 
-  const isProcessing = () => {
-    return loading || !hasDefault()
+  const isNotReady = () => {
+    return loading || !hasDefault() || isCopying||copyStatus.done
   }
 
   useEffect(() => {
@@ -197,7 +204,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="spaceId"
               value={spaceId}
               onChange={handleSetSpace}
-              isDisabled={isProcessing()||isCopying}
+              isDisabled={isNotReady()}
           >
             <Select.Option value="">Space</Select.Option>
 
@@ -212,7 +219,7 @@ const Sidebar = ({ sdk }: SidebarProps) => {
               name="environmentId"
               value={environmentId}
               onChange={(e) => setEnvironmentId(e.target.value)}
-              isDisabled={isProcessing()||isCopying}
+              isDisabled={isNotReady()}
           >
             <Select.Option value="">Environment</Select.Option>
 
@@ -238,8 +245,8 @@ const Sidebar = ({ sdk }: SidebarProps) => {
           variant="secondary"
           onClick={showMessage}
           isFullWidth
-          isLoading={isProcessing()||isCopying}
-          isDisabled={isProcessing()||isCopying}
+          isLoading={isNotReady()&&!copyStatus.done}
+          isDisabled={isNotReady()}
           endIcon={<CloudUploadIcon />}
       >
         Copy to
@@ -255,6 +262,19 @@ const Sidebar = ({ sdk }: SidebarProps) => {
         <Text>Copying...</Text>
         <Text>{count.processed} of {count.total} Entries</Text>
       </Flex>
+    }
+
+    { position > 1 &&
+      <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
+          <Text>Queued</Text>
+          <Text>{position}</Text>
+      </Flex>
+    }
+    { copyStatus.date &&
+    <Flex justifyContent="space-between" style={{marginTop: '10px'}}>
+        <Text>Date copied</Text>
+        <Text>{copyStatus.date}</Text>
+    </Flex>
     }
     </>
 
